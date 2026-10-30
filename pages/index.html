@@ -310,19 +310,12 @@ async function start() {
     await instance.start(
       { facingMode: "environment" },
       {
-        fps: 10,
-
-        qrbox: (width, height) => ({
-          width: Math.max(
-            1,
-            Math.min(300, Math.floor(width * 0.85))
-          ),
-          height: Math.max(
-            1,
-            Math.min(150, Math.floor(height * 0.5))
-          )
-        })
-      },
+  fps: 15,
+  qrbox: (width, height) => ({
+    width: Math.max(1, Math.floor(width * 0.9)),
+    height: Math.max(1, Math.floor(height * 0.65))
+  })
+},
 
       async decodedText => {
         if (busy) return;
