@@ -29,8 +29,14 @@ export default {
 
     try {
       if (!env.GAS_URL || !env.GAS_SHARED_SECRET) {
-        throw new Error('Server not configured');
-      }
+  throw new Error(
+    'Missing configuration: ' +
+    [
+      !env.GAS_URL ? 'GAS_URL' : null,
+      !env.GAS_SHARED_SECRET ? 'GAS_SHARED_SECRET' : null
+    ].filter(Boolean).join(', ')
+  );
+}
 
       const input = await request.json();
 
