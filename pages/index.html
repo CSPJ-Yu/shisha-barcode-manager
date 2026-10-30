@@ -1,22 +1,522 @@
-<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Shisha Barcode</title>
-<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-<style>body{font-family:-apple-system,sans-serif;background:#f4f5f7;margin:0;padding:16px;color:#202124}main{max-width:560px;margin:auto}section{background:white;border-radius:14px;padding:16px;margin:14px 0}button,input,select{width:100%;box-sizing:border-box;font-size:16px;padding:13px;margin:6px 0;border-radius:9px;border:1px solid #ccc}button{background:#222;color:white;border:0}button:disabled{opacity:.5}.hidden{display:none}#status{white-space:pre-wrap;overflow-wrap:anywhere;background:#e7edf9;padding:12px;border-radius:10px}#reader{width:100%}</style></head>
-<body><main><h2>💨 Shisha Barcode Manager</h2><section><div id="reader"></div><button id="start">📷 カメラを起動</button><button id="stop" class="hidden">カメラを停止</button><p>読み取った後は一時停止します。登録後に「次を読み取る」で再開できます。</p></section>
-<section><label>手動入力（カメラが使えない場合）<input id="manual" inputmode="numeric" placeholder="バーコード8〜14桁"></label><button id="manualGo">番号を検索</button></section>
-<section id="form" class="hidden"><h3>未登録バーコード</h3><p id="barcode"></p><label>メーカー<select id="maker"><option value="">すべて</option></select></label><label>フレーバー検索<input id="search" placeholder="名前を入力"></label><label>フレーバー<select id="flavor"></select></label><button id="save">紐づけ登録</button></section>
-<section id="result" class="hidden"><h3 id="resultTitle"></h3><p id="resultText"></p><button id="next">次を読み取る</button></section><p id="status">読み込み中...</p></main>
+
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Shisha Barcode Manager</title>
+
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      padding: 16px;
+      background: #f4f5f7;
+      color: #202124;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    main { max-width: 560px; margin: auto; }
+
+    h2 { margin: 12px 0 20px; }
+
+    section {
+      background: white;
+      border-radius: 14px;
+      padding: 16px;
+      margin: 14px 0;
+    }
+
+    button, input, select {
+      width: 100%;
+      padding: 13px;
+      margin: 6px 0;
+      font-size: 16px;
+      border-radius: 9px;
+      border: 1px solid #ccc;
+    }
+
+    button {
+      background: #222;
+      color: white;
+      border: 0;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      opacity: .5;
+      cursor: not-allowed;
+    }
+
+    .secondary { background: #657080; }
+    .hidden { display: none !important; }
+
+    #reader {
+      width: 100%;
+      overflow: hidden;
+      border-radius: 10px;
+      background: #111;
+    }
+
+    #reader video {
+      width: 100% !important;
+      height: auto !important;
+      object-fit: contain;
+    }
+
+    #status {
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      background: #e7edf9;
+      padding: 12px;
+      border-radius: 10px;
+      font-size: 14px;
+    }
+
+    #resultText { white-space: pre-wrap; }
+
+    .hint {
+      color: #666;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .barcode-value {
+      font-weight: bold;
+      overflow-wrap: anywhere;
+    }
+  </style>
+</head>
+
+<body>
+<main>
+  <h2>💨 Shisha Barcode Manager</h2>
+
+  <section>
+    <h3>📷 バーコードスキャン</h3>
+
+    <div id="reader"></div>
+
+    <button id="start">カメラを起動</button>
+    <button id="stop" class="secondary hidden">カメラを停止</button>
+    <button id="switch" class="secondary hidden">カメラを切り替え</button>
+
+    <p class="hint">
+      JANコードの線全体を画面内に収めてください。
+      明るい場所で、バーコードから少し離してピントを合わせると認識しやすくなります。
+    </p>
+  </section>
+
+  <section>
+    <h3>⌨️ 手動入力</h3>
+
+    <label for="manual">バーコード番号</label>
+    <input
+      id="manual"
+      inputmode="numeric"
+      autocomplete="off"
+      placeholder="バーコード8〜14桁"
+    >
+
+    <button id="manualGo">番号を検索</button>
+  </section>
+
+  <section id="form" class="hidden">
+    <h3>未登録バーコード</h3>
+    <p id="barcode" class="barcode-value"></p>
+
+    <label for="maker">メーカー</label>
+    <select id="maker">
+      <option value="">すべて</option>
+    </select>
+
+    <label for="search">フレーバー検索</label>
+    <input id="search" placeholder="名前を入力">
+
+    <label for="flavor">フレーバー</label>
+    <select id="flavor"></select>
+
+    <button id="save">紐づけ登録</button>
+  </section>
+
+  <section id="result" class="hidden">
+    <h3 id="resultTitle"></h3>
+    <p id="resultText"></p>
+    <button id="next">次を読み取る</button>
+  </section>
+
+  <p id="status">読み込み中...</p>
+</main>
+
 <script>
-const $=id=>document.getElementById(id);let scanner=null,flavors=[],current='',busy=false;
-function status(s){$('status').textContent=s}
-function errorText(e){return typeof e==='string'?e:(e?.message||String(e))}
-async function api(action,other={}){const r=await fetch('/api/barcodes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,...other})});const j=await r.json();if(!r.ok||!j.ok)throw Error(j.error||'API error');return j.data}
-function filter(){const maker=$('maker').value,q=$('search').value.trim().toLowerCase();const items=flavors.filter(f=>(!maker||f.maker===maker)&&f.flavor.toLowerCase().includes(q));$('flavor').replaceChildren(...items.map(f=>{const o=document.createElement('option');o.value=f.id;o.textContent=f.maker+' / '+f.flavor;return o}));$('save').disabled=!items.length}
-async function init(){try{flavors=await api('list');const makers=[...new Set(flavors.map(f=>f.maker))].sort();for(const m of makers){const o=document.createElement('option');o.value=m;o.textContent=m;$('maker').append(o)}filter();status('準備完了：'+flavors.length+'種類')}catch(e){status('初期化エラー：'+errorText(e))}}
-async function stop(){if(scanner){try{if(scanner.isScanning)await scanner.stop();scanner.clear()}catch(e){console.warn(e)}scanner=null}$('start').classList.remove('hidden');$('stop').classList.add('hidden')}
-async function start(){if(scanner||busy)return;try{if(!window.Html5Qrcode)throw Error('読み取りライブラリが読み込めません');if(!navigator.mediaDevices?.getUserMedia)throw Error('カメラAPIが利用できません');$('form').classList.add('hidden');$('result').classList.add('hidden');status('カメラ起動中...');scanner=new Html5Qrcode('reader',{formatsToSupport:[Html5QrcodeSupportedFormats.EAN_13,Html5QrcodeSupportedFormats.EAN_8,Html5QrcodeSupportedFormats.UPC_A,Html5QrcodeSupportedFormats.UPC_E,Html5QrcodeSupportedFormats.CODE_128]});await scanner.start({facingMode:'environment'},{fps:10,qrbox:{width:250,height:150}},async value=>{if(busy)return;busy=true;await stop();try{await lookup(value)}finally{busy=false}},()=>{});$('start').classList.add('hidden');$('stop').classList.remove('hidden');status('バーコードを映してください')}catch(e){await stop();status('カメラ起動エラー：'+errorText(e))}}
-async function lookup(value){current=String(value).trim();if(!/^\d{8,14}$/.test(current)){status('8〜14桁のバーコードを入力してください');return}try{$('form').classList.add('hidden');$('result').classList.add('hidden');status('照合中：'+current);const data=await api('lookup',{barcode:current});if(data.found){const f=flavors.find(x=>x.id===data.flavorId);showResult('登録済み',current+'\n'+(f?f.maker+' / '+f.flavor:'ID: '+data.flavorId))}else{$('barcode').textContent=current;$('form').classList.remove('hidden');filter();status('未登録：フレーバーを選んで登録してください')}}catch(e){status('照合エラー：'+errorText(e))}}
-function showResult(title,txt){$('form').classList.add('hidden');$('result').classList.remove('hidden');$('resultTitle').textContent=title;$('resultText').textContent=txt;$('resultText').style.whiteSpace='pre-wrap';status(title)}
-$('start').onclick=start;$('stop').onclick=stop;$('maker').onchange=filter;$('search').oninput=filter;$('manualGo').onclick=async()=>{await stop();await lookup($('manual').value)};
-$('save').onclick=async()=>{const id=$('flavor').value;if(!id)return;const barcode=current;$('save').disabled=true;try{const data=await api('register',{barcode,flavorId:id});showResult('登録完了',data.barcode+'\n'+data.flavor.maker+' / '+data.flavor.flavor)}catch(e){status('登録エラー：'+errorText(e))}finally{filter()}};
-$('next').onclick=async()=>{$('result').classList.add('hidden');$('manual').value='';await start()};init();
-</script></body></html>
+"use strict";
+
+const $ = id => document.getElementById(id);
+
+let scanner = null;
+let flavors = [];
+let current = "";
+let busy = false;
+let cameraBusy = false;
+let cameraIds = [];
+let cameraIndex = 0;
+
+function status(message) {
+  $("status").textContent = message;
+}
+
+function errorText(error) {
+  return typeof error === "string"
+    ? error
+    : (error?.message || String(error));
+}
+
+async function api(action, other = {}) {
+  const response = await fetch("/api/barcodes", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      action,
+      ...other
+    })
+  });
+
+  const result = await response.json();
+
+  if (!response.ok || !result.ok) {
+    throw new Error(result.error || "API error");
+  }
+
+  return result.data;
+}
+
+function filter() {
+  const maker = $("maker").value;
+  const query = $("search").value.trim().toLowerCase();
+
+  const items = flavors.filter(f =>
+    (!maker || f.maker === maker) &&
+    String(f.flavor).toLowerCase().includes(query)
+  );
+
+  const options = items.map(f => {
+    const option = document.createElement("option");
+    option.value = f.id;
+    option.textContent = f.maker + " / " + f.flavor;
+    return option;
+  });
+
+  $("flavor").replaceChildren(...options);
+  $("save").disabled = items.length === 0 || busy;
+}
+
+async function init() {
+  try {
+    flavors = await api("list");
+
+    const makers = [
+      ...new Set(flavors.map(f => f.maker))
+    ].sort();
+
+    for (const maker of makers) {
+      const option = document.createElement("option");
+      option.value = maker;
+      option.textContent = maker;
+      $("maker").append(option);
+    }
+
+    filter();
+    status("準備完了：" + flavors.length + "種類のフレーバーを取得");
+
+  } catch (error) {
+    status("初期化エラー：" + errorText(error));
+  }
+}
+
+function updateCameraButtons(scanning) {
+  $("start").classList.toggle("hidden", scanning);
+  $("stop").classList.toggle("hidden", !scanning);
+  $("switch").classList.toggle(
+    "hidden",
+    !scanning || cameraIds.length < 2
+  );
+}
+
+async function stop() {
+  if (cameraBusy) return;
+
+  cameraBusy = true;
+
+  try {
+    if (scanner) {
+      const oldScanner = scanner;
+      scanner = null;
+
+      try {
+        if (oldScanner.isScanning) {
+          await oldScanner.stop();
+        }
+      } catch (error) {
+        console.warn("Camera stop:", error);
+      }
+
+      try {
+        oldScanner.clear();
+      } catch (error) {
+        console.warn("Camera clear:", error);
+      }
+    }
+  } finally {
+    cameraBusy = false;
+    updateCameraButtons(false);
+  }
+}
+
+async function start() {
+  if (scanner || busy || cameraBusy) return;
+
+  if (!window.Html5Qrcode) {
+    status("読み取りライブラリを読み込めませんでした");
+    return;
+  }
+
+  if (!navigator.mediaDevices?.getUserMedia) {
+    status("このブラウザではカメラを利用できません");
+    return;
+  }
+
+  cameraBusy = true;
+
+  try {
+    $("form").classList.add("hidden");
+    $("result").classList.add("hidden");
+
+    status("カメラ起動中...");
+
+    const formats = [
+      Html5QrcodeSupportedFormats.EAN_13,
+      Html5QrcodeSupportedFormats.EAN_8,
+      Html5QrcodeSupportedFormats.UPC_A,
+      Html5QrcodeSupportedFormats.UPC_E,
+      Html5QrcodeSupportedFormats.CODE_128,
+      Html5QrcodeSupportedFormats.CODE_39,
+      Html5QrcodeSupportedFormats.ITF
+    ];
+
+    const instance = new Html5Qrcode("reader", {
+      formatsToSupport: formats,
+      verbose: false
+    });
+
+    scanner = instance;
+
+    const cameraConfig = cameraIds.length
+      ? cameraIds[cameraIndex]
+      : { facingMode: "environment" };
+
+    await instance.start(
+      cameraConfig,
+      {
+        fps: 15,
+        disableFlip: true,
+        videoConstraints: {
+          facingMode: "environment"
+        }
+      },
+      async decodedText => {
+        if (busy) return;
+
+        busy = true;
+
+        const value = String(decodedText).trim();
+
+        status("読み取り成功：" + value);
+
+        // 読み取り成功時に停止する。
+        // cameraBusy が解除されるまで待機する必要があるため、
+        // 直接 scanner.stop() を呼ぶ。
+        try {
+          if (instance.isScanning) {
+            await instance.stop();
+          }
+
+          instance.clear();
+        } catch (error) {
+          console.warn("Scan stop:", error);
+        }
+
+        if (scanner === instance) {
+          scanner = null;
+        }
+
+        updateCameraButtons(false);
+
+        try {
+          await lookup(value);
+        } finally {
+          busy = false;
+        }
+      },
+      () => {
+        // 読み取り失敗は通常のスキャン動作なので表示しない。
+      }
+    );
+
+    updateCameraButtons(true);
+    status("スキャン中：バーコードの線全体を映してください");
+
+    // カメラ起動後に利用可能なカメラを取得する。
+    try {
+      const cameras = await Html5Qrcode.getCameras();
+
+      cameraIds = cameras.map(camera => camera.id);
+
+      if (cameraIds.length > 1) {
+        const activeTrack = instance.getRunningTrackCameraCapabilities?.();
+        console.log("Available cameras:", cameras, activeTrack);
+      }
+
+      updateCameraButtons(true);
+    } catch (error) {
+      console.warn("Camera list:", error);
+    }
+
+  } catch (error) {
+    status("カメラ起動エラー：" + errorText(error));
+
+    if (scanner) {
+      try {
+        if (scanner.isScanning) await scanner.stop();
+        scanner.clear();
+      } catch (_) {}
+
+      scanner = null;
+    }
+
+    updateCameraButtons(false);
+
+  } finally {
+    cameraBusy = false;
+  }
+}
+
+async function switchCamera() {
+  if (cameraIds.length < 2 || cameraBusy || busy) return;
+
+  await stop();
+
+  cameraIndex = (cameraIndex + 1) % cameraIds.length;
+
+  await start();
+}
+
+async function lookup(value) {
+  current = String(value).trim();
+
+  if (!/^\d{8,14}$/.test(current)) {
+    status("8〜14桁の数字バーコードを入力してください");
+    return;
+  }
+
+  try {
+    $("form").classList.add("hidden");
+    $("result").classList.add("hidden");
+
+    status("照合中：" + current);
+
+    const data = await api("lookup", {
+      barcode: current
+    });
+
+    if (data.found) {
+      const flavor = flavors.find(
+        f => f.id === data.flavorId
+      );
+
+      showResult(
+        "登録済み",
+        current + "\n" +
+        (flavor
+          ? flavor.maker + " / " + flavor.flavor
+          : "ID: " + data.flavorId)
+      );
+
+    } else {
+      $("barcode").textContent = current;
+      $("form").classList.remove("hidden");
+      filter();
+
+      status("未登録：フレーバーを選んで登録してください");
+    }
+
+  } catch (error) {
+    status("照合エラー：" + errorText(error));
+  }
+}
+
+function showResult(title, text) {
+  $("form").classList.add("hidden");
+  $("result").classList.remove("hidden");
+
+  $("resultTitle").textContent = title;
+  $("resultText").textContent = text;
+
+  status(title);
+}
+
+$("start").onclick = start;
+$("stop").onclick = stop;
+$("switch").onclick = switchCamera;
+
+$("maker").onchange = filter;
+$("search").oninput = filter;
+
+$("manualGo").onclick = async () => {
+  await stop();
+  await lookup($("manual").value);
+};
+
+$("save").onclick = async () => {
+  const flavorId = $("flavor").value;
+  if (!flavorId || busy) return;
+
+  busy = true;
+  $("save").disabled = true;
+
+  try {
+    const data = await api("register", {
+      barcode: current,
+      flavorId
+    });
+
+    showResult(
+      "登録完了",
+      data.barcode + "\n" +
+      data.flavor.maker + " / " +
+      data.flavor.flavor
+    );
+
+  } catch (error) {
+    status("登録エラー：" + errorText(error));
+
+  } finally {
+    busy = false;
+    filter();
+  }
+};
+
+$("next").onclick = async () => {
+  $("result").classList.add("hidden");
+  $("manual").value = "";
+  await start();
+};
+
+init();
+</script>
+</body>
+</html>
